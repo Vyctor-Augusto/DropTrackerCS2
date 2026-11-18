@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Drop Tracker CS2</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/drop-tracker.preview.png" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img class="logo" src="/drop-tracker.preview.png" alt="" width="42" height="42" />
+        <div>
+          <h1>Drop Tracker <span class="tag">CS2</span></h1>
+          <p class="muted" id="ruleLine">Carregando…</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" id="btnRefresh" title="Ler os inventários agora">↻ Atualizar tudo</button>
+        <button class="btn primary" id="btnAdd">+ Adicionar conta</button>
+        <button class="btn icon" id="btnSettings" title="Configurações" aria-label="Configurações">⚙</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="offline hidden" id="offline">
+        <strong>Servidor local desligado.</strong>
+        <span>O painel abriu, mas a API parou de responder. Rode o <code>iniciar.bat</code> — esta mensagem desaparece sozinha quando o servidor voltar.</span>
+      </div>
+
+      <section class="overview">
+        <article class="tile">
+          <span class="tile-label">Próximo reset</span>
+          <strong class="tile-value" id="countdown">—</strong>
+          <span class="tile-sub" id="resetDate">—</span>
+          <div class="weekbar"><div id="weekbarFill"></div></div>
+        </article>
+        <article class="tile tile-pending">
+          <span class="tile-label">Falta dropar</span>
+          <strong class="tile-value" id="countPending">0</strong>
+          <span class="tile-sub">prioridade agora</span>
+        </article>
+        <article class="tile tile-done">
+          <span class="tile-label">Já dropou</span>
+          <strong class="tile-value" id="countDone">0</strong>
+          <span class="tile-sub">nessa semana</span>
+        </article>
+        <article class="tile tile-unknown">
+          <span class="tile-label">Indefinido</span>
+          <strong class="tile-value" id="countUnknown">0</strong>
+          <span class="tile-sub">sem leitura confiável</span>
+        </article>
+      </section>
+
+      <section class="earnings earnings-top hidden" id="earningsTop">
+        <div class="earnings-head">
+          <h2>Ganhos estimados</h2>
+          <p class="muted small">Preços do Mercado da Comunidade Steam em reais (menor anúncio). Valor estimado — não é venda realizada.</p>
+        </div>
+        <div class="earnings-summary">
+          <article class="etile"><span class="etile-label">Esta semana</span><strong class="etile-value" id="earnWeek">R$ 0,00</strong></article>
+          <article class="etile"><span class="etile-label">Este mês</span><strong class="etile-value" id="earnMonth">R$ 0,00</strong></article>
+          <article class="etile"><span class="etile-label">Este ano</span><strong class="etile-value" id="earnYear">R$ 0,00</strong></article>
+          <article class="etile etile-total"><span class="etile-label">Total</span><strong class="etile-value" id="earnTotal">R$ 0,00</strong></article>
+        </div>
+      </section>
+
+      <div class="busy hidden" id="busy"><span class="spinner"></span> Lendo inventários…</div>
+
+      <section class="grid" id="accounts"></section>
+
+      <section class="empty hidden" id="empty">
+        <div class="empty-icon">📦</div>
+        <h2>Nenhuma conta ainda</h2>
+        <p class="muted">
+          Cole o link do perfil da Steam (ou o SteamID64) e o app passa a acompanhar o drop semanal.
+          O inventário de CS2 precisa estar <strong>público</strong>.
+        </p>
+        <button class="btn primary" id="btnAddEmpty">+ Adicionar a primeira conta</button>
+      </section>
+
+      <section class="earnings earnings-list hidden" id="earningsList">
+        <div class="earnings-head">
+          <h2>Todos os itens dropados</h2>
+          <p class="muted small">Lista completa de itens registrados como drop, por semana, com valor estimado em reais.</p>
+        </div>
+        <div class="earnings-weeks" id="earnWeeks"></div>
+      </section>
+
+      <footer class="foot">
+        <span id="pollInfo" class="muted"></span>
+        <span class="muted dot">·</span>
+        <span class="muted">dados salvos localmente</span>
+      </footer>
+    </main>
+
+    <!-- Adicionar conta -->
+    <dialog id="dialogAdd">
+      <form id="formAdd">
+        <h2>Adicionar conta</h2>
+        <p class="muted small">
+          Cole o link do perfil (<code>steamcommunity.com/id/nome</code> ou <code>/profiles/7656…</code>)
+          ou o SteamID64. Não pedimos senha: só lemos o inventário público.
+        </p>
+        <label class="field">
+          <span>Link ou SteamID64</span>
+          <input name="input" type="text" placeholder="https://steamcommunity.com/id/fulano" required autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Apelido <em class="muted">(opcional)</em></span>
+          <input name="label" type="text" placeholder="Conta principal" maxlength="60" autocomplete="off" />
+        </label>
+        <p class="form-error hidden" id="addError"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" data-close>Cancelar</button>
+          <button type="submit" class="btn primary" id="btnAddSubmit">Adicionar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Configurações -->
+    <dialog id="dialogSettings">
+      <form id="formSettings">
+        <h2>Configurações</h2>
+        <p class="muted small">Quando o drop semanal reseta. O horário é em UTC.</p>
+        <div class="row">
+          <label class="field">
+            <span>Dia</span>
+            <select name="resetWeekday" id="selWeekday"></select>
+          </label>
+          <label class="field narrow">
+            <span>Hora (UTC)</span>
+            <input name="resetHour" id="inpHour" type="number" min="0" max="23" />
+          </label>
+          <label class="field narrow">
+            <span>Minuto</span>
+            <input name="resetMinute" id="inpMinute" type="number" min="0" max="59" />
+          </label>
+        </div>
+        <p class="hint" id="localHint"></p>
+        <label class="field">
+          <span>Atualizar sozinho a cada</span>
+          <select name="pollMinutes" id="selPoll">
+            <option value="30">30 minutos</option>
+            <option value="60">1 hora</option>
+            <option value="180">3 horas</option>
+            <option value="360">6 horas</option>
+            <option value="720">12 horas</option>
+            <option value="1440">1 dia</option>
+          </select>
+        </label>
+        <p class="form-error hidden" id="settingsError"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" data-close>Cancelar</button>
+          <button type="submit" class="btn primary">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Registrar itens que droparam -->
+    <dialog id="dialogDrop" class="dialog-wide">
+      <form id="formDrop">
+        <h2 id="dropTitle">Itens que droparam</h2>
+        <p class="muted small" id="dropSubtitle">Marque o que caiu nesta semana e confira o valor no mercado.</p>
+        <div class="drop-toolbar">
+          <button type="button" class="btn sm" id="btnDropPrices">Buscar preços na Steam</button>
+          <label class="toggle-all"><input type="checkbox" id="chkDropAll" /> Mostrar todos os itens do inventário</label>
+        </div>
+        <div class="drop-search">
+          <label class="field" style="margin:0;flex:1">
+            <span>Buscar item na Steam</span>
+            <input type="text" id="dropSearchInput" placeholder="Ex.: AK-47 Redline, Case..." autocomplete="off" />
+          </label>
+          <button type="button" class="btn sm" id="btnDropSearch">Buscar</button>
+        </div>
+        <div class="drop-search-results hidden" id="dropSearchResults"></div>
+        <div class="drop-list" id="dropList"></div>
+        <p class="drop-total">Selecionados: <strong id="dropSelectedCount">0</strong> · Valor estimado: <strong id="dropSelectedTotal">R$ 0,00</strong></p>
+        <p class="form-error hidden" id="dropError"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" id="btnDropOnlyMark">Só marcar como dropou</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" data-close>Cancelar</button>
+          <button type="submit" class="btn primary" id="btnDropSave">Salvar itens</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

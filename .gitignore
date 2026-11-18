@@ -1,0 +1,24 @@
+# Dependências (nenhuma hoje, mas por segurança)
+node_modules/
+
+# Dados locais (contém informações das contas Steam)
+data/
+!data/.gitkeep
+
+# Variáveis de ambiente (segredos)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+data/tray.log
+
+# Arquivos temporários
+*.tmp
+*.bak
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
